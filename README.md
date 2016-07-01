@@ -1,6 +1,6 @@
 # Ricoh Media Storage for Java
 
-This open-source library allows you to integrate Ricoh Media Storage into your Android app.
+This open-source library allows you to integrate Ricoh Media Storage into your Java app.
 
 Learn more at http://docs.ricohapi.com/
 
@@ -16,7 +16,7 @@ You'll also need
 If you don't have them, please register yourself and your client from [THETA Developers Website](http://contest.theta360.com/).
 
 ## Installation
-This section shows you to install Ricoh Media Storage for Java in your application.  
+This section shows you to install Ricoh Media Storage for Java in your application.
 See [Media Storage Sample](https://github.com/ricohapi/media-storage-java/tree/master/sample#media-storage-sample) to try out a sample of Ricoh Media Storage for Java.
 
 * Download: [`ricoh-api-mstorage.jar`](https://github.com/ricohapi/media-storage-java/blob/v1.0.0/lib/ricoh-api-mstorage.jar?raw=true)
@@ -33,11 +33,11 @@ dependencies {
 ## Sample Flow
 ```java
 // import
+import com.ricohapi.auth.AuthClient;
+import com.ricohapi.auth.CompletionHandler;
+import com.ricohapi.auth.entity.AuthResult;
 import com.ricohapi.mstorage.MediaStorage;
 import com.ricohapi.mstorage.entity.MediaInfo;
-import com.ricohapi.auth.AuthClient;
-import com.ricohapi.auth.AuthResult;
-import com.ricohapi.auth.CompletionHandler;
 
 // Set your Ricoh API Client Credentials
 AuthClient authClient = new AuthClient("<your_client_id>", "<your_client_secret>");
@@ -158,6 +158,8 @@ mstorage.download("<media_id>", new CompletionHandler<MediaContent>() {
 ```
 
 ### List media ids
+* Without options
+
 You'll get a default list if you set an empty `Map` object or `null` on the first parameter.
 ```java
 mstorage.list(null, new CompletionHandler<MediaList>() {
@@ -179,11 +181,13 @@ mstorage.list(null, new CompletionHandler<MediaList>() {
 });
 ```
 
+* With options
+
 You can also use listing options by setting values on `Map` object as follows.
 The available options are `limit`, `after` and `before`.
 ```java
-Map<String, String> params = new HashMap<String, String>();
-params.put("limit", "25");
+Map<String, Object> params = new HashMap<String, Object>();
+params.put("limit", 25);
 params.put("after", "<media_id>");
 mstorage.list(params, new CompletionHandler<MediaList>() {
     @Override
@@ -198,7 +202,35 @@ mstorage.list(params, new CompletionHandler<MediaList>() {
 });
 ```
 
-### Delete
+
+* Search
+
+You can add another `Map` object with `filter` key into the listing options to search by user metadata.
+```java
+Map<String, Object> params = new HashMap<String, Object>();
+params.put("limit", 25);
+params.put("after", "<media_id>");
+
+Map<String, String> filter = new HashMap<String, String>();
+filter.put("meta.user.<key1>", "<value1>");
+filter.put("meta.user.<key2>", "<value2>");
+
+params.put("filter", filter);
+
+mstorage.list(params, new CompletionHandler<MediaList>() {
+    @Override
+    public void onCompleted(MediaList mediaList) {
+        // Do something.
+    }
+
+    @Override
+    public void onThrowable(Throwable t) {
+        // Something wrong happened.
+    }
+});
+```
+
+### Delete media
 ```java
 mstorage.delete("<media_id>", new CompletionHandler<Object>() {
     @Override
@@ -233,14 +265,132 @@ mstorage.info("<media_id>", new CompletionHandler<MediaInfo>() {
 });
 ```
 
+### Attach media metadata
+You can define your original metadata as a 'user metadata'.
+Existing metadata value for the same key will be overwritten. Up to 10 user metadata can be attached to a media data. 
+
+```java
+Map<String, String> userMeta = new HashMap<String, String>();
+userMeta.put("user.<key1>", "<value1>");
+userMeta.put("user.<key2>", "<value2>");
+mstorage.addMeta("<media_id>", userMeta, new CompletionHandler<Object>() {
+    @Override
+    public void onCompleted(Object result) {
+        // Do something.
+        // "result" may be empty.
+    }
+
+    @Override
+    public void onThrowable(Throwable t) {
+        // Something wrong happened.
+    }
+});
+```
+
 ### Get media metadata
+* All
 ```java
 mstorage.meta("<media_id>", new CompletionHandler<MediaMeta>() {
     @Override
     public void onCompleted(MediaMeta mediaMeta) {
         Map<String, String> exif = mediaMeta.getExif();
         Map<String, String> gpano = mediaMeta.getGpano();
+        Map<String, String> userMeta = mediaMeta.getUserMeta();
         // Do something.
+    }
+
+    @Override
+    public void onThrowable(Throwable t) {
+        // Something wrong happened.
+    }
+});
+```
+
+* Exif
+```java
+mstorage.meta("<media_id>", "exif", new CompletionHandler<Map<String, String>>() {
+    @Override
+    public void onCompleted(Map<String, String> exif) {
+        // Do something.
+    }
+
+    @Override
+    public void onThrowable(Throwable t) {
+        // Something wrong happened.
+    }
+});
+```
+
+* Google Photo Sphere XMP
+```java
+mstorage.meta("<media_id>", "gpano", new CompletionHandler<Map<String, String>>() {
+    @Override
+    public void onCompleted(Map<String, String> gpano) {
+        // Do something.
+    }
+
+    @Override
+    public void onThrowable(Throwable t) {
+        // Something wrong happened.
+    }
+});
+```
+
+* User metadata (all)
+```java
+mstorage.meta("<media_id>", "user", new CompletionHandler<Map<String, String>>() {
+    @Override
+    public void onCompleted(Map<String, String> userMeta) {
+        // Do something.
+    }
+
+    @Override
+    public void onThrowable(Throwable t) {
+        // Something wrong happened.
+    }
+});
+```
+
+* User metadata (with a key)
+```java
+mstorage.meta("<media_id>", "user.<key>", new CompletionHandler<Map<String, String>>() {
+    @Override
+    public void onCompleted(Map<String, String> userMeta) {
+        String value = userMeta.get("<key>");
+        // Do something.
+    }
+
+    @Override
+    public void onThrowable(Throwable t) {
+        // Something wrong happened.
+    }
+});
+```
+
+### Delete media metadata
+* User metadata (all)
+```java
+mstorage.removeMeta("<media_id>", "user", new CompletionHandler<Object>() {
+    @Override
+    public void onCompleted(Object result) {
+        // Do something.
+        // "result" may be empty.
+    }
+
+    @Override
+    public void onThrowable(Throwable t) {
+        // Something wrong happened.
+    }
+});
+```
+
+* User metadata (with a key)
+```java
+mstorage.removeMeta("<media_id>", "user.<key>", new CompletionHandler<Object>() {
+    @Override
+    public void onCompleted(Object result) {
+        // Do something.
+        // "result" may be empty.
     }
 
     @Override
