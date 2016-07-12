@@ -8,7 +8,6 @@ package com.ricohapi.mstorage.response;
 import com.ricohapi.mstorage.entity.MediaIndex;
 import com.ricohapi.mstorage.entity.Paging;
 
-import java.util.Map;
 import java.util.List;
 
 public class RespList {
