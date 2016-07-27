@@ -29,7 +29,6 @@ import java.util.regex.Pattern;
 
 public class MediaStorage {
     private AuthClient authClient;
-    private String accessToken;
 
     private static final String ENDPOINT = "https://mss.ricohapi.com/v1/media";
     private static final String SEARCH_PATH = "/search";
@@ -54,7 +53,6 @@ public class MediaStorage {
         authClient.session(Scope.MSTORAGE, new CompletionHandler<AuthResult>() {
             @Override
             public void onCompleted(AuthResult result) {
-                MediaStorage.this.accessToken = result.getAccessToken();
                 handler.onCompleted(result);
             }
 
@@ -65,292 +63,387 @@ public class MediaStorage {
         });
     }
 
-    public void upload(InputStream inputStream, CompletionHandler<MediaInfo> handler) {
-        try {
-            if (accessToken == null) {
-                throw new RicohAPIException(0, "wrong usage: use the connect method to get an access token.");
-            }
-            RicohAPIRequest request = new RicohAPIRequest(ENDPOINT);
-            Map<String, String> header = new HashMap<>();
-            header.put("Authorization", "Bearer " + accessToken);
-            header.put("Content-Type", "image/jpeg");
-            request.upload(header, inputStream);
+    public void upload(final InputStream inputStream, final CompletionHandler<MediaInfo> handler) {
+        authClient.getAccessToken(new CompletionHandler<AuthResult>(){
+            @Override
+            public void onCompleted(AuthResult result) {
+                try {
+                    if (result.getAccessToken() == null) {
+                        throw new RicohAPIException(0, "wrong usage: use the connect method to get an access token.");
+                    }
+                    RicohAPIRequest request = new RicohAPIRequest(ENDPOINT);
+                    Map<String, String> header = new HashMap<>();
+                    header.put("Authorization", "Bearer " + result.getAccessToken());
+                    header.put("Content-Type", "image/jpeg");
+                    request.upload(header, inputStream);
 
-            if (request.isSucceeded()) {
-                MediaInfo mediaInfo = JSON.decode(request.getResponseBody(), MediaInfo.class);
-                handler.onCompleted(mediaInfo);
-            } else {
-                throw new RicohAPIException(request.getResponseCode(), request.getErrorBody());
+                    if (request.isSucceeded()) {
+                        MediaInfo mediaInfo = JSON.decode(request.getResponseBody(), MediaInfo.class);
+                        handler.onCompleted(mediaInfo);
+                    } else {
+                        throw new RicohAPIException(request.getResponseCode(), request.getErrorBody());
+                    }
+                } catch (IOException e) {
+                    handler.onThrowable(e);
+                } catch (RicohAPIException e) {
+                    handler.onThrowable(e);
+                }
             }
-        } catch (IOException e) {
-            handler.onThrowable(e);
-        } catch (RicohAPIException e) {
-            handler.onThrowable(e);
-        }
+
+            @Override
+            public void onThrowable(Throwable t) {
+                t.printStackTrace();
+                handler.onThrowable(t);
+            }
+        });
     }
 
-    public void download(String mediaId, CompletionHandler<MediaContent> handler) {
-        try {
-            if (accessToken == null) {
-                throw new RicohAPIException(0, "wrong usage: use the connect method to get an access token.");
+    public void download(final String mediaId, final CompletionHandler<MediaContent> handler) {
+        authClient.getAccessToken(new CompletionHandler<AuthResult>(){
+            @Override
+            public void onCompleted(AuthResult result) {
+                try {
+                    if (result.getAccessToken() == null) {
+                        throw new RicohAPIException(0, "wrong usage: use the connect method to get an access token.");
+                    }
+
+                    Map<String, String> header = new HashMap<>();
+                    header.put("Authorization", "Bearer " + result.getAccessToken());
+
+                    RicohAPIRequest request = new RicohAPIRequest(ENDPOINT + "/" + mediaId + GET_CONTENT_PATH);
+                    InputStream inputStream = request.download(header);
+
+                    if (request.isSucceeded()) {
+                        handler.onCompleted(new MediaContent(inputStream));
+                    } else {
+                        throw new RicohAPIException(request.getResponseCode(), request.getErrorBody());
+                    }
+
+                } catch (RicohAPIException e) {
+                    handler.onThrowable(e);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
             }
 
-            Map<String, String> header = new HashMap<>();
-            header.put("Authorization", "Bearer " + accessToken);
-
-            RicohAPIRequest request = new RicohAPIRequest(ENDPOINT + "/" + mediaId + GET_CONTENT_PATH);
-            InputStream inputStream = request.download(header);
-
-            if (request.isSucceeded()) {
-                handler.onCompleted(new MediaContent(inputStream));
-            } else {
-                throw new RicohAPIException(request.getResponseCode(), request.getErrorBody());
+            @Override
+            public void onThrowable(Throwable t) {
+                t.printStackTrace();
+                handler.onThrowable(t);
             }
-
-        } catch (RicohAPIException e) {
-            handler.onThrowable(e);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
+        });
     }
 
-    public void list(Map<String, ?> params, CompletionHandler<MediaList> handler) {
-        try {
-            if (accessToken == null) {
-                throw new RicohAPIException(0, "wrong usage: use the connect method to get an access token.");
-            }
-            RicohAPIRequest request;
-            Map<String, String> header = new HashMap<>();
-            header.put("Authorization", "Bearer " + accessToken);
-            if (params == null || params.isEmpty()) {
-                // GET /media
-                request = new RicohAPIRequest(ENDPOINT);
-                request.get(header);
-            } else {
-                if (!params.containsKey(LIST_PARAM_KEY_FILTER) || params.get(LIST_PARAM_KEY_FILTER) == null) {
-                    // GET /media
-                    request = new RicohAPIRequest(ENDPOINT, params);
-                    request.get(header);
-                } else {
-                    // POST /media/search
-                    Map<String, Object> searchParams = new HashMap<>();
-                    searchParams.put("search_version", "2016-07-08");
-                    Map<String, Object> paging = new HashMap<>();
-                    for (String key : params.keySet()) {
-                        if (LIST_PARAM_KEY_FILTER.equals(key)) {
-                            searchParams.put("query", params.get(LIST_PARAM_KEY_FILTER));
+    public void list(final Map<String, ?> params, final CompletionHandler<MediaList> handler) {
+        authClient.getAccessToken(new CompletionHandler<AuthResult>(){
+            @Override
+            public void onCompleted(AuthResult result) {
+                try {
+                    if (result.getAccessToken() == null) {
+                        throw new RicohAPIException(0, "wrong usage: use the connect method to get an access token.");
+                    }
+                    RicohAPIRequest request;
+                    Map<String, String> header = new HashMap<>();
+                    header.put("Authorization", "Bearer " + result.getAccessToken());
+                    if (params == null || params.isEmpty()) {
+                        // GET /media
+                        request = new RicohAPIRequest(ENDPOINT);
+                        request.get(header);
+                    } else {
+                        if (!params.containsKey(LIST_PARAM_KEY_FILTER) || params.get(LIST_PARAM_KEY_FILTER) == null) {
+                            // GET /media
+                            request = new RicohAPIRequest(ENDPOINT, params);
+                            request.get(header);
                         } else {
-                            paging.put(key, params.get(key));
+                            // POST /media/search
+                            Map<String, Object> searchParams = new HashMap<>();
+                            searchParams.put("search_version", "2016-07-08");
+                            Map<String, Object> paging = new HashMap<>();
+                            for (String key : params.keySet()) {
+                                if (LIST_PARAM_KEY_FILTER.equals(key)) {
+                                    searchParams.put("query", params.get(LIST_PARAM_KEY_FILTER));
+                                } else {
+                                    paging.put(key, params.get(key));
+                                }
+                            }
+                            searchParams.put("paging", paging);
+
+                            request = new RicohAPIRequest(ENDPOINT + SEARCH_PATH);
+                            request.post(header, searchParams, RicohAPIRequest.ParamType.JSON);
                         }
                     }
-                    searchParams.put("paging", paging);
 
-                    request = new RicohAPIRequest(ENDPOINT + SEARCH_PATH);
-                    request.post(header, searchParams, RicohAPIRequest.ParamType.JSON);
+                    if (request.isSucceeded()) {
+                        RespList list = JSON.decode(request.getResponseBody(), RespList.class);
+                        handler.onCompleted(new MediaList(list.getMedia(), list.getPaging()));
+                    } else {
+                        throw new RicohAPIException(request.getResponseCode(), request.getErrorBody());
+                    }
+                } catch (IOException e) {
+                    handler.onThrowable(e);
+                } catch (RicohAPIException e) {
+                    handler.onThrowable(e);
                 }
             }
 
-            if (request.isSucceeded()) {
-                RespList list = JSON.decode(request.getResponseBody(), RespList.class);
-                handler.onCompleted(new MediaList(list.getMedia(), list.getPaging()));
-            } else {
-                throw new RicohAPIException(request.getResponseCode(), request.getErrorBody());
+            @Override
+            public void onThrowable(Throwable t) {
+                t.printStackTrace();
+                handler.onThrowable(t);
             }
-        } catch (IOException e) {
-            handler.onThrowable(e);
-        } catch (RicohAPIException e) {
-            handler.onThrowable(e);
-        }
+        });
     }
 
-    public void delete(String mediaId, CompletionHandler<Object> handler) {
-        try {
-            if (accessToken == null) {
-                throw new RicohAPIException(0, "wrong usage: use the connect method to get an access token.");
+    public void delete(final String mediaId, final CompletionHandler<Object> handler) {
+        authClient.getAccessToken(new CompletionHandler<AuthResult>(){
+            @Override
+            public void onCompleted(AuthResult result) {
+                try {
+                    if (result.getAccessToken() == null) {
+                        throw new RicohAPIException(0, "wrong usage: use the connect method to get an access token.");
+                    }
+                    RicohAPIRequest request = new RicohAPIRequest(ENDPOINT + "/" + mediaId);
+                    Map<String, String> header = new HashMap<>();
+                    header.put("Authorization", "Bearer " + result.getAccessToken());
+
+                    request.delete(header);
+
+                    if (request.isSucceeded()) {
+                        handler.onCompleted(new Object());
+                    } else {
+                        throw new RicohAPIException(request.getResponseCode(), request.getErrorBody());
+                    }
+                } catch (IOException e) {
+                    handler.onThrowable(e);
+                } catch (RicohAPIException e) {
+                    handler.onThrowable(e);
+                }
             }
-            RicohAPIRequest request = new RicohAPIRequest(ENDPOINT + "/" + mediaId);
-            Map<String, String> header = new HashMap<>();
-            header.put("Authorization", "Bearer " + accessToken);
 
-            request.delete(header);
-
-            if (request.isSucceeded()) {
-                handler.onCompleted(new Object());
-            } else {
-                throw new RicohAPIException(request.getResponseCode(), request.getErrorBody());
+            @Override
+            public void onThrowable(Throwable t) {
+                t.printStackTrace();
+                handler.onThrowable(t);
             }
-        } catch (IOException e) {
-            handler.onThrowable(e);
-        } catch (RicohAPIException e) {
-            handler.onThrowable(e);
-        }
-
+        });
     }
 
+    public void info(final String mediaId, final CompletionHandler<MediaInfo> handler) {
+        authClient.getAccessToken(new CompletionHandler<AuthResult>(){
+            @Override
+            public void onCompleted(AuthResult result) {
+                try {
+                    if (result.getAccessToken() == null) {
+                        throw new RicohAPIException(0, "wrong usage: use the connect method to get an access token.");
+                    }
+                    RicohAPIRequest request = new RicohAPIRequest(ENDPOINT + "/" + mediaId);
+                    Map<String, String> header = new HashMap<>();
+                    header.put("Authorization", "Bearer " + result.getAccessToken());
 
-    public void info(String mediaId, CompletionHandler<MediaInfo> handler) {
-        try {
-            if (accessToken == null) {
-                throw new RicohAPIException(0, "wrong usage: use the connect method to get an access token.");
+                    request.get(header);
+
+                    if (request.isSucceeded()) {
+                        MediaInfo mediaInfo = JSON.decode(request.getResponseBody(), MediaInfo.class);
+                        handler.onCompleted(mediaInfo);
+                    } else {
+                        throw new RicohAPIException(request.getResponseCode(), request.getErrorBody());
+                    }
+                } catch (IOException e) {
+                    handler.onThrowable(e);
+                } catch (RicohAPIException e) {
+                    handler.onThrowable(e);
+                }
             }
-            RicohAPIRequest request = new RicohAPIRequest(ENDPOINT + "/" + mediaId);
-            Map<String, String> header = new HashMap<>();
-            header.put("Authorization", "Bearer " + accessToken);
 
-            request.get(header);
-
-            if (request.isSucceeded()) {
-                MediaInfo mediaInfo = JSON.decode(request.getResponseBody(), MediaInfo.class);
-                handler.onCompleted(mediaInfo);
-            } else {
-                throw new RicohAPIException(request.getResponseCode(), request.getErrorBody());
+            @Override
+            public void onThrowable(Throwable t) {
+                t.printStackTrace();
+                handler.onThrowable(t);
             }
-        } catch (IOException e) {
-            handler.onThrowable(e);
-        } catch (RicohAPIException e) {
-            handler.onThrowable(e);
-        }
+        });
     }
 
-    public void meta(String mediaId, CompletionHandler<MediaMeta> handler) {
-        try {
-            if (accessToken == null) {
-                throw new RicohAPIException(0, "wrong usage: use the connect method to get an access token.");
+    public void meta(final String mediaId, final CompletionHandler<MediaMeta> handler) {
+        authClient.getAccessToken(new CompletionHandler<AuthResult>(){
+            @Override
+            public void onCompleted(AuthResult result) {
+                try {
+                    if (result.getAccessToken() == null) {
+                        throw new RicohAPIException(0, "wrong usage: use the connect method to get an access token.");
+                    }
+                    RicohAPIRequest request = new RicohAPIRequest(ENDPOINT + "/" + mediaId + GET_META_PATH);
+
+                    Map<String, String> header = new HashMap<>();
+                    header.put("Authorization", "Bearer " + result.getAccessToken());
+
+                    request.get(header);
+
+                    if (request.isSucceeded()) {
+                        RespMeta respMeta = JSON.decode(request.getResponseBody(), RespMeta.class);
+                        handler.onCompleted(new MediaMeta(respMeta));
+                    } else {
+                        throw new RicohAPIException(request.getResponseCode(), request.getErrorBody());
+                    }
+                } catch (IOException e) {
+                    handler.onThrowable(e);
+                } catch (RicohAPIException e) {
+                    handler.onThrowable(e);
+                }
             }
-            RicohAPIRequest request = new RicohAPIRequest(ENDPOINT + "/" + mediaId + GET_META_PATH);
 
-            Map<String, String> header = new HashMap<>();
-            header.put("Authorization", "Bearer " + accessToken);
-
-            request.get(header);
-
-            if (request.isSucceeded()) {
-                RespMeta respMeta = JSON.decode(request.getResponseBody(), RespMeta.class);
-                handler.onCompleted(new MediaMeta(respMeta));
-            } else {
-                throw new RicohAPIException(request.getResponseCode(), request.getErrorBody());
+            @Override
+            public void onThrowable(Throwable t) {
+                t.printStackTrace();
+                handler.onThrowable(t);
             }
-        } catch (IOException e) {
-            handler.onThrowable(e);
-        } catch (RicohAPIException e) {
-            handler.onThrowable(e);
-        }
-
+        });
     }
 
-    public void meta(String mediaId, String fieldName, CompletionHandler<Map<String, String>> handler) {
-        try {
-            if (accessToken == null) {
-                throw new RicohAPIException(0, "wrong usage: use the connect method to get an access token.");
-            }
-            Map<String, String> header = new HashMap<>();
-            header.put("Authorization", "Bearer " + accessToken);
-            if (fieldName == null) {
-                throw new RicohAPIException(0, "invalid fieldName: null");
-            } else if (META_EXIF.equals(fieldName) || META_GPANO.equals(fieldName) || META_USER.equals(fieldName)) {
-                // GET /media/{id}/meta/exif, /media/{id}/meta/gpano, /media/{id}/meta/user
-                RicohAPIRequest request = new RicohAPIRequest(ENDPOINT + "/" + mediaId + GET_META_PATH + "/" + fieldName);
-                request.get(header);
+    public void meta(final String mediaId, final String fieldName, final CompletionHandler<Map<String, String>> handler) {
+        authClient.getAccessToken(new CompletionHandler<AuthResult>(){
+            @Override
+            public void onCompleted(AuthResult result) {
+                try {
+                    if (result.getAccessToken() == null) {
+                        throw new RicohAPIException(0, "wrong usage: use the connect method to get an access token.");
+                    }
+                    Map<String, String> header = new HashMap<>();
+                    header.put("Authorization", "Bearer " + result.getAccessToken());
+                    if (fieldName == null) {
+                        throw new RicohAPIException(0, "invalid fieldName: null");
+                    } else if (META_EXIF.equals(fieldName) || META_GPANO.equals(fieldName) || META_USER.equals(fieldName)) {
+                        // GET /media/{id}/meta/exif, /media/{id}/meta/gpano, /media/{id}/meta/user
+                        RicohAPIRequest request = new RicohAPIRequest(ENDPOINT + "/" + mediaId + GET_META_PATH + "/" + fieldName);
+                        request.get(header);
 
-                if (request.isSucceeded()) {
-                    Map<String, String> respMap = JSON.decode(request.getResponseBody(), new TypeReference<Map<String, String>>() {});
-                    handler.onCompleted(respMap);
-                } else {
-                    throw new RicohAPIException(request.getResponseCode(), request.getErrorBody());
-                }
-            } else {
-                String userMetaKey = replaceUserMeta(fieldName);
-                if (userMetaKey == null) {
-                    throw new RicohAPIException(0, "invalid fieldName: " + fieldName);
-                }
-                // GET /media/{id}/meta/user/{key}
-                RicohAPIRequest request = new RicohAPIRequest(ENDPOINT + "/" + mediaId + USER_META_PATH + "/" + userMetaKey);
-                request.get(header);
+                        if (request.isSucceeded()) {
+                            Map<String, String> respMap = JSON.decode(request.getResponseBody(), new TypeReference<Map<String, String>>() {});
+                            handler.onCompleted(respMap);
+                        } else {
+                            throw new RicohAPIException(request.getResponseCode(), request.getErrorBody());
+                        }
+                    } else {
+                        String userMetaKey = replaceUserMeta(fieldName);
+                        if (userMetaKey == null) {
+                            throw new RicohAPIException(0, "invalid fieldName: " + fieldName);
+                        }
+                        // GET /media/{id}/meta/user/{key}
+                        RicohAPIRequest request = new RicohAPIRequest(ENDPOINT + "/" + mediaId + USER_META_PATH + "/" + userMetaKey);
+                        request.get(header);
 
-                if (request.isSucceeded()) {
-                    Map<String, String> respMap = new HashMap<>();
-                    respMap.put(userMetaKey, request.getResponseBody());
-                    handler.onCompleted(respMap);
-                } else {
-                    throw new RicohAPIException(request.getResponseCode(), request.getErrorBody());
+                        if (request.isSucceeded()) {
+                            Map<String, String> respMap = new HashMap<>();
+                            respMap.put(userMetaKey, request.getResponseBody());
+                            handler.onCompleted(respMap);
+                        } else {
+                            throw new RicohAPIException(request.getResponseCode(), request.getErrorBody());
+                        }
+                    }
+                } catch (IOException e) {
+                    handler.onThrowable(e);
+                } catch (RicohAPIException e) {
+                    handler.onThrowable(e);
                 }
             }
-        } catch (IOException e) {
-            handler.onThrowable(e);
-        } catch (RicohAPIException e) {
-            handler.onThrowable(e);
-        }
+
+            @Override
+            public void onThrowable(Throwable t) {
+                t.printStackTrace();
+                handler.onThrowable(t);
+            }
+        });
     }
 
-    public void addMeta(String mediaId, Map<String, String> userMeta, CompletionHandler<Object> handler) {
-        try {
-            if (accessToken == null) {
-                throw new RicohAPIException(0, "wrong usage: use the connect method to get an access token.");
-            }
-            RicohAPIRequest request;
+    public void addMeta(final String mediaId, final Map<String, String> userMeta, final CompletionHandler<Object> handler) {
+        authClient.getAccessToken(new CompletionHandler<AuthResult>(){
+            @Override
+            public void onCompleted(AuthResult result) {
+                try {
+                    if (result.getAccessToken() == null) {
+                        throw new RicohAPIException(0, "wrong usage: use the connect method to get an access token.");
+                    }
+                    RicohAPIRequest request;
 
-            for(String userMetaKey : userMeta.keySet()) {
-                String requestUserMetaKey = replaceUserMeta(userMetaKey);
-                String value = userMeta.get(userMetaKey);
+                    for(String userMetaKey : userMeta.keySet()) {
+                        String requestUserMetaKey = replaceUserMeta(userMetaKey);
+                        String value = userMeta.get(userMetaKey);
 
-                if (requestUserMetaKey == null || !isValidValue(value)) {
-                    throw new RicohAPIException(0, "invalid parameter: " + "{" + userMetaKey + "=" + value + "}");
+                        if (requestUserMetaKey == null || !isValidValue(value)) {
+                            throw new RicohAPIException(0, "invalid parameter: " + "{" + userMetaKey + "=" + value + "}");
+                        }
+                        request = new RicohAPIRequest(ENDPOINT + "/" + mediaId + USER_META_PATH + "/" + requestUserMetaKey);
+                        Map<String, String> header = new HashMap<>();
+                        header.put("Authorization", "Bearer " + result.getAccessToken());
+                        header.put("Content-Type", "text/plain");
+
+                        request.put(header, value);
+
+                        if (request.isSucceeded()) {
+                            handler.onCompleted(new Object());
+                        } else {
+                            throw new RicohAPIException(request.getResponseCode(), request.getErrorBody());
+                        }
+                    }
+                } catch (IOException e) {
+                    handler.onThrowable(e);
+                } catch (RicohAPIException e) {
+                    handler.onThrowable(e);
                 }
-                request = new RicohAPIRequest(ENDPOINT + "/" + mediaId + USER_META_PATH + "/" + requestUserMetaKey);
-                Map<String, String> header = new HashMap<>();
-                header.put("Authorization", "Bearer " + accessToken);
-                header.put("Content-Type", "text/plain");
-
-                request.put(header, value);
-
-                if (request.isSucceeded()) {
-                    handler.onCompleted(new Object());
-                } else {
-                    throw new RicohAPIException(request.getResponseCode(), request.getErrorBody());
-                }
             }
-        } catch (IOException e) {
-            handler.onThrowable(e);
-        } catch (RicohAPIException e) {
-            handler.onThrowable(e);
-        }
+
+            @Override
+            public void onThrowable(Throwable t) {
+                t.printStackTrace();
+                handler.onThrowable(t);
+            }
+        });
     }
 
-    public void removeMeta(String mediaId, String key, CompletionHandler<Object> handler) {
-        try {
-            if (accessToken == null) {
-                throw new RicohAPIException(0, "wrong usage: use the connect method to get an access token.");
-            }
-            RicohAPIRequest request;
-            if (key == null) {
-                throw new RicohAPIException(0, "invalid parameter: null");
-            } else if (META_USER.equals(key)) {
-                // DELETE /media/{id}/meta/user
-                request = new RicohAPIRequest(ENDPOINT + "/" + mediaId + USER_META_PATH);
-            } else {
-                String userMetaKey = replaceUserMeta(key);
-                if (userMetaKey == null) {
-                    throw new RicohAPIException(0, "invalid parameter: " + key);
+    public void removeMeta(final String mediaId, final String key, final CompletionHandler<Object> handler) {
+        authClient.getAccessToken(new CompletionHandler<AuthResult>(){
+            @Override
+            public void onCompleted(AuthResult result) {
+                try {
+                    if (result.getAccessToken() == null) {
+                        throw new RicohAPIException(0, "wrong usage: use the connect method to get an access token.");
+                    }
+                    RicohAPIRequest request;
+                    if (key == null) {
+                        throw new RicohAPIException(0, "invalid parameter: null");
+                    } else if (META_USER.equals(key)) {
+                        // DELETE /media/{id}/meta/user
+                        request = new RicohAPIRequest(ENDPOINT + "/" + mediaId + USER_META_PATH);
+                    } else {
+                        String userMetaKey = replaceUserMeta(key);
+                        if (userMetaKey == null) {
+                            throw new RicohAPIException(0, "invalid parameter: " + key);
+                        }
+                        // DELETE /media/{id}/meta/user/{key}
+                        request = new RicohAPIRequest(ENDPOINT + "/" + mediaId + USER_META_PATH + "/" + userMetaKey);
+                    }
+                    Map<String, String> header = new HashMap<>();
+                    header.put("Authorization", "Bearer " + result.getAccessToken());
+
+                    request.delete(header);
+
+                    if (request.isSucceeded()) {
+                        handler.onCompleted(new Object());
+                    } else {
+                        throw new RicohAPIException(request.getResponseCode(), request.getErrorBody());
+                    }
+                } catch (IOException e) {
+                    handler.onThrowable(e);
+                } catch (RicohAPIException e) {
+                    handler.onThrowable(e);
                 }
-                // DELETE /media/{id}/meta/user/{key}
-                request = new RicohAPIRequest(ENDPOINT + "/" + mediaId + USER_META_PATH + "/" + userMetaKey);
             }
-            Map<String, String> header = new HashMap<>();
-            header.put("Authorization", "Bearer " + accessToken);
 
-            request.delete(header);
-
-            if (request.isSucceeded()) {
-                handler.onCompleted(new Object());
-            } else {
-                throw new RicohAPIException(request.getResponseCode(), request.getErrorBody());
+            @Override
+            public void onThrowable(Throwable t) {
+                t.printStackTrace();
+                handler.onThrowable(t);
             }
-        } catch (IOException e) {
-            handler.onThrowable(e);
-        } catch (RicohAPIException e) {
-            handler.onThrowable(e);
-        }
+        });
     }
 
     private String replaceUserMeta(String userMeta){
