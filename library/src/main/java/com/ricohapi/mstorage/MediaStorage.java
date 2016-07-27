@@ -29,7 +29,6 @@ import java.util.regex.Pattern;
 
 public class MediaStorage {
     private AuthClient authClient;
-    private String accessToken;
 
     private static final String ENDPOINT = "https://mss.ricohapi.com/v1/media";
     private static final String SEARCH_PATH = "/search";
@@ -54,7 +53,6 @@ public class MediaStorage {
         authClient.session(Scope.MSTORAGE, new CompletionHandler<AuthResult>() {
             @Override
             public void onCompleted(AuthResult result) {
-                MediaStorage.this.accessToken = result.getAccessToken();
                 handler.onCompleted(result);
             }
 
@@ -70,12 +68,12 @@ public class MediaStorage {
             @Override
             public void onCompleted(AuthResult result) {
                 try {
-                    if (accessToken == null) {
+                    if (result.getAccessToken() == null) {
                         throw new RicohAPIException(0, "wrong usage: use the connect method to get an access token.");
                     }
                     RicohAPIRequest request = new RicohAPIRequest(ENDPOINT);
                     Map<String, String> header = new HashMap<>();
-                    header.put("Authorization", "Bearer " + accessToken);
+                    header.put("Authorization", "Bearer " + result.getAccessToken());
                     header.put("Content-Type", "image/jpeg");
                     request.upload(header, inputStream);
 
@@ -105,12 +103,12 @@ public class MediaStorage {
             @Override
             public void onCompleted(AuthResult result) {
                 try {
-                    if (accessToken == null) {
+                    if (result.getAccessToken() == null) {
                         throw new RicohAPIException(0, "wrong usage: use the connect method to get an access token.");
                     }
 
                     Map<String, String> header = new HashMap<>();
-                    header.put("Authorization", "Bearer " + accessToken);
+                    header.put("Authorization", "Bearer " + result.getAccessToken());
 
                     RicohAPIRequest request = new RicohAPIRequest(ENDPOINT + "/" + mediaId + GET_CONTENT_PATH);
                     InputStream inputStream = request.download(header);
@@ -141,12 +139,12 @@ public class MediaStorage {
             @Override
             public void onCompleted(AuthResult result) {
                 try {
-                    if (accessToken == null) {
+                    if (result.getAccessToken() == null) {
                         throw new RicohAPIException(0, "wrong usage: use the connect method to get an access token.");
                     }
                     RicohAPIRequest request;
                     Map<String, String> header = new HashMap<>();
-                    header.put("Authorization", "Bearer " + accessToken);
+                    header.put("Authorization", "Bearer " + result.getAccessToken());
                     if (params == null || params.isEmpty()) {
                         // GET /media
                         request = new RicohAPIRequest(ENDPOINT);
@@ -201,12 +199,12 @@ public class MediaStorage {
             @Override
             public void onCompleted(AuthResult result) {
                 try {
-                    if (accessToken == null) {
+                    if (result.getAccessToken() == null) {
                         throw new RicohAPIException(0, "wrong usage: use the connect method to get an access token.");
                     }
                     RicohAPIRequest request = new RicohAPIRequest(ENDPOINT + "/" + mediaId);
                     Map<String, String> header = new HashMap<>();
-                    header.put("Authorization", "Bearer " + accessToken);
+                    header.put("Authorization", "Bearer " + result.getAccessToken());
 
                     request.delete(header);
 
@@ -235,12 +233,12 @@ public class MediaStorage {
             @Override
             public void onCompleted(AuthResult result) {
                 try {
-                    if (accessToken == null) {
+                    if (result.getAccessToken() == null) {
                         throw new RicohAPIException(0, "wrong usage: use the connect method to get an access token.");
                     }
                     RicohAPIRequest request = new RicohAPIRequest(ENDPOINT + "/" + mediaId);
                     Map<String, String> header = new HashMap<>();
-                    header.put("Authorization", "Bearer " + accessToken);
+                    header.put("Authorization", "Bearer " + result.getAccessToken());
 
                     request.get(header);
 
@@ -270,13 +268,13 @@ public class MediaStorage {
             @Override
             public void onCompleted(AuthResult result) {
                 try {
-                    if (accessToken == null) {
+                    if (result.getAccessToken() == null) {
                         throw new RicohAPIException(0, "wrong usage: use the connect method to get an access token.");
                     }
                     RicohAPIRequest request = new RicohAPIRequest(ENDPOINT + "/" + mediaId + GET_META_PATH);
 
                     Map<String, String> header = new HashMap<>();
-                    header.put("Authorization", "Bearer " + accessToken);
+                    header.put("Authorization", "Bearer " + result.getAccessToken());
 
                     request.get(header);
 
@@ -306,11 +304,11 @@ public class MediaStorage {
             @Override
             public void onCompleted(AuthResult result) {
                 try {
-                    if (accessToken == null) {
+                    if (result.getAccessToken() == null) {
                         throw new RicohAPIException(0, "wrong usage: use the connect method to get an access token.");
                     }
                     Map<String, String> header = new HashMap<>();
-                    header.put("Authorization", "Bearer " + accessToken);
+                    header.put("Authorization", "Bearer " + result.getAccessToken());
                     if (fieldName == null) {
                         throw new RicohAPIException(0, "invalid fieldName: null");
                     } else if (META_EXIF.equals(fieldName) || META_GPANO.equals(fieldName) || META_USER.equals(fieldName)) {
@@ -361,7 +359,7 @@ public class MediaStorage {
             @Override
             public void onCompleted(AuthResult result) {
                 try {
-                    if (accessToken == null) {
+                    if (result.getAccessToken() == null) {
                         throw new RicohAPIException(0, "wrong usage: use the connect method to get an access token.");
                     }
                     RicohAPIRequest request;
@@ -375,7 +373,7 @@ public class MediaStorage {
                         }
                         request = new RicohAPIRequest(ENDPOINT + "/" + mediaId + USER_META_PATH + "/" + requestUserMetaKey);
                         Map<String, String> header = new HashMap<>();
-                        header.put("Authorization", "Bearer " + accessToken);
+                        header.put("Authorization", "Bearer " + result.getAccessToken());
                         header.put("Content-Type", "text/plain");
 
                         request.put(header, value);
@@ -406,7 +404,7 @@ public class MediaStorage {
             @Override
             public void onCompleted(AuthResult result) {
                 try {
-                    if (accessToken == null) {
+                    if (result.getAccessToken() == null) {
                         throw new RicohAPIException(0, "wrong usage: use the connect method to get an access token.");
                     }
                     RicohAPIRequest request;
@@ -424,7 +422,7 @@ public class MediaStorage {
                         request = new RicohAPIRequest(ENDPOINT + "/" + mediaId + USER_META_PATH + "/" + userMetaKey);
                     }
                     Map<String, String> header = new HashMap<>();
-                    header.put("Authorization", "Bearer " + accessToken);
+                    header.put("Authorization", "Bearer " + result.getAccessToken());
 
                     request.delete(header);
 
